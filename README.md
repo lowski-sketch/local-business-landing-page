@@ -132,3 +132,15 @@ Organizing and documenting a software project
 
 Testing a web application in a browser
 
+
+
+\## Live Demo
+
+
+
+The LocalPro landing page is published online with Netlify.
+
+
+
+Website: https://glistening-youtiao-ef3f15.netlify.app
+

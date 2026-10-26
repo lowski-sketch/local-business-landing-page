@@ -1,3 +1,4 @@
+
 from flask_cors import CORS
 from flask import Flask, request, jsonify
 import sqlite3
@@ -7,7 +8,6 @@ import re
 app = Flask(__name__)
 CORS(app)
 
-# Store the database in this project's folder.
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE = BASE_DIR / "leads.db"
 
@@ -37,7 +37,6 @@ def home():
 
 @app.route("/api/quotes", methods=["POST"])
 def create_quote():
-    # Expect the website to send JSON data.
     data = request.get_json(silent=True)
 
     if not isinstance(data, dict):
@@ -51,13 +50,11 @@ def create_quote():
     service = str(data.get("service", "")).strip()
     details = str(data.get("details", "")).strip()
 
-    # Check required fields.
     if not name or not email or not service:
         return jsonify({
             "error": "Name, email, and service are required."
         }), 400
 
-    # Apply basic length limits.
     if len(name) > 100 or len(email) > 254:
         return jsonify({
             "error": "Name or email is too long."
@@ -68,15 +65,13 @@ def create_quote():
             "error": "One or more fields exceed the allowed length."
         }), 400
 
-    # Basic email-format check.
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         return jsonify({
             "error": "Please enter a valid email address."
         }), 400
 
-    # Save the request using parameterized SQL.
-    # Parameterized SQL helps prevent SQL injection.
-    with sqlite3.connect(DATABASE) as connection:
+    connection = sqlite3.connect(DATABASE)
+    try:
         cursor = connection.execute("""
             INSERT INTO quote_requests
                 (name, email, phone, service, details)
@@ -84,6 +79,9 @@ def create_quote():
         """, (name, email, phone, service, details))
 
         quote_id = cursor.lastrowid
+        connection.commit()
+    finally:
+        connection.close()
 
     return jsonify({
         "message": "Your quote request was received.",
@@ -93,6 +91,4 @@ def create_quote():
 
 if __name__ == "__main__":
     initialize_database()
-
-    # Local development only. Do not expose this server publicly as-is.
     app.run(host="127.0.0.1", port=5000, debug=False)

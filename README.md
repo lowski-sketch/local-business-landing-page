@@ -85,9 +85,26 @@ This is a development prototype, not yet a production-ready lead-management syst
 - Connect the Netlify frontend to the deployed API
 - Configure production CORS rules
 - Add stronger server-side validation and spam protection
-- Add automated API and database tests
 - Improve accessibility and browser testing
 - Add business-specific branding and contact information
+
+## Automated Tests
+
+The project includes five automated tests for the Flask API:
+
+- Confirms the home route responds successfully.
+- Verifies valid quote requests are saved to the SQLite database.
+- Rejects requests with missing required fields.
+- Rejects invalid email addresses.
+- Rejects requests that do not contain valid JSON.
+
+Run the tests from the project folder with:
+
+```powershell
+.venv\Scripts\python.exe -m unittest -v test_app.py
+```
+
+The tests use a temporary database, keeping test submissions separate from the local project database.
 
 ## Skills Demonstrated
 

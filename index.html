@@ -1,0 +1,201 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Reliable local services with straightforward quotes and professional customer care.">
+  <title>LocalPro | Professional Local Services</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+
+  <script>
+    const quoteForm = document.getElementById("quote-form");
+    const formMessage = document.getElementById("form-message");
+
+ window.addEventListener("DOMContentLoaded", function () {
+  const yearElement = document.getElementById("year");
+
+  if (yearElement) {
+    yearElement.textContent = new Date().getFullYear();
+  }
+});
+
+    quoteForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      if (!quoteForm.reportValidity()) {
+        return;
+      }
+
+      const formData = new FormData(quoteForm);
+
+      const name = formData.get("name").trim();
+      const email = formData.get("email").trim();
+      const phone = formData.get("phone").trim();
+      const service = formData.get("service");
+      const details = formData.get("details").trim();
+
+      const request = [
+        "QUOTE REQUEST",
+        "==============",
+        "Name: " + name,
+        "Email: " + email,
+        "Phone: " + (phone || "Not provided"),
+        "Service: " + service,
+        "Project details: " + details
+      ].join("\n");
+
+      const blob = new Blob([request], {
+        type: "text/plain;charset=utf-8"
+      });
+
+      const downloadUrl = URL.createObjectURL(blob);
+      const downloadLink = document.createElement("a");
+
+      downloadLink.href = downloadUrl;
+      downloadLink.download = "quote-request.txt";
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+
+      URL.revokeObjectURL(downloadUrl);
+
+      formMessage.textContent =
+        "Demo request prepared! Your quote-request file should download. This has not been sent to a business.";
+
+      quoteForm.reset();
+    });
+  </script>
+</body>
+</html>
+
+<body>
+  <header>
+    <nav aria-label="Main navigation">
+      <a href="#" class="logo">Local<span>Pro</span></a>
+      <a href="#services">Services</a>
+      <a href="#about">Why Choose Us</a>
+      <a href="#quote" class="nav-cta">Get a Free Quote</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">YOUR LOCAL SERVICE PARTNER</p>
+      <h1>Quality Service.<br>Real Peace of Mind.</h1>
+      <p class="hero-text">
+        Professional service, clear communication, and solutions
+        built around your needs. Tell us what you need and get started
+        with a quote.
+      </p>
+      <a href="#quote" class="button">Request a Free Quote</a>
+      <a href="#services" class="text-link">Explore our services →</a>
+    </section>
+
+    <section id="services" class="section">
+      <p class="eyebrow">WHAT WE DO</p>
+      <h2>Services designed around you</h2>
+      <p class="section-intro">
+        Replace these examples with the services your business offers.
+      </p>
+
+      <div class="service-grid">
+        <article class="service-card">
+          <div class="service-icon" aria-hidden="true">01</div>
+          <h3>Home Services</h3>
+          <p>Dependable help with everyday home projects and upkeep.</p>
+          <a href="#quote">Ask for a quote →</a>
+        </article>
+
+        <article class="service-card">
+          <div class="service-icon" aria-hidden="true">02</div>
+          <h3>Business Services</h3>
+          <p>Practical solutions to help local businesses run smoothly.</p>
+          <a href="#quote">Ask for a quote →</a>
+        </article>
+
+        <article class="service-card">
+          <div class="service-icon" aria-hidden="true">03</div>
+          <h3>Custom Projects</h3>
+          <p>Have a specific need? Tell us about your project.</p>
+          <a href="#quote">Ask for a quote →</a>
+        </article>
+      </div>
+    </section>
+
+    <section id="about" class="why-section">
+      <p class="eyebrow">WHY LOCALPRO</p>
+      <h2>A better service experience</h2>
+      <div class="benefit-grid">
+        <article>
+          <h3>Clear Communication</h3>
+          <p>Know what to expect, from your first inquiry to the finished job.</p>
+        </article>
+        <article>
+          <h3>Solutions That Fit</h3>
+          <p>Get recommendations based on your project and your needs.</p>
+        </article>
+        <article>
+          <h3>Customer Focus</h3>
+          <p>Make it easy to ask questions and discuss your next project.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="quote" class="quote-section">
+      <p class="eyebrow">LET'S GET STARTED</p>
+      <h2>Tell us what you need</h2>
+      <p>
+        Share a few details about your project. We'll use them to
+        understand what kind of service you're looking for.
+      </p>
+
+    <form id="quote-form">
+        <label for="name">Your name</label>
+        <input id="name" name="name" type="text"
+          placeholder="Jane Smith" autocomplete="name" required>
+
+        <label for="email">Email address</label>
+        <input id="email" name="email" type="email"
+          placeholder="jane@example.com" autocomplete="email" required>
+
+        <label for="phone">Phone number (optional)</label>
+        <input id="phone" name="phone" type="tel"
+          placeholder="Your phone number" autocomplete="tel">
+
+        <label for="service">Which service do you need?</label>
+        <select id="service" name="service" required>
+          <option value="">Choose a service</option>
+          <option value="Home Services">Home Services</option>
+          <option value="Business Services">Business Services</option>
+          <option value="Custom Project">Custom Project</option>
+          <option value="Other">Other</option>
+        </select>
+
+        <label for="details">Tell us about your project</label>
+        <textarea id="details" name="details" rows="4"
+          placeholder="What would you like help with?" required></textarea>
+
+        <button type="submit" class="button">Prepare My Quote Request</button>
+        <p id="form-message" role="status" aria-live="polite"></p>
+        <p class="form-note">
+          Demo form: requests are not sent to a business yet.
+        </p>
+      </form>
+    </section>
+  </main>
+
+  <footer>
+    <a href="#" class="logo">Local<span>Pro</span></a>
+    <p>Professional local service, built around your needs.</p>
+    <p>&copy; <span id="year">2026</span> LocalPro. Replace with your business details.</p>
+  </footer>
+</body>
+</html>
+  </script>
+</body>
+</html>
+  </script>
+</body>
+</html>

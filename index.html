@@ -9,19 +9,22 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 
-  <script>
-    const quoteForm = document.getElementById("quote-form");
-    const formMessage = document.getElementById("form-message");
-
- window.addEventListener("DOMContentLoaded", function () {
+    <script>
+window.addEventListener("DOMContentLoaded", function () {
+  const quoteForm = document.getElementById("quote-form");
+  const formMessage = document.getElementById("form-message");
   const yearElement = document.getElementById("year");
 
   if (yearElement) {
     yearElement.textContent = new Date().getFullYear();
   }
-});
 
-    quoteForm.addEventListener("submit", function (event) {
+  if (!quoteForm) {
+    console.error("Could not find the quote form. Check its ID.");
+    return;
+  }
+
+  quoteForm.addEventListener("submit", async function (event) {
       event.preventDefault();
 
       if (!quoteForm.reportValidity()) {
@@ -36,39 +39,44 @@
       const service = formData.get("service");
       const details = formData.get("details").trim();
 
-      const request = [
-        "QUOTE REQUEST",
-        "==============",
-        "Name: " + name,
-        "Email: " + email,
-        "Phone: " + (phone || "Not provided"),
-        "Service: " + service,
-        "Project details: " + details
-      ].join("\n");
+    
+      try {
+        const response = await fetch("http://127.0.0.1:5000/api/quotes", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            name: name,
+            email: email,
+            phone: phone,
+            service: service,
+            details: details
+          })
+        });
 
-      const blob = new Blob([request], {
-        type: "text/plain;charset=utf-8"
-      });
+        const result = await response.json();
 
-      const downloadUrl = URL.createObjectURL(blob);
-      const downloadLink = document.createElement("a");
+        if (!response.ok) {
+          throw new Error(result.error || "Could not submit the quote request.");
+        }
 
-      downloadLink.href = downloadUrl;
-      downloadLink.download = "quote-request.txt";
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      downloadLink.remove();
-
-      URL.revokeObjectURL(downloadUrl);
+        formMessage.textContent = "Your quote request was saved successfully!";
+        quoteForm.reset();
+      } catch (error) {
+        console.error("Quote submission failed:", error);
+        formMessage.textContent =
+          "Could not send your request. Please check that the backend is running and try again.";
+      }
 
       formMessage.textContent =
         "Demo request prepared! Your quote-request file should download. This has not been sent to a business.";
 
       quoteForm.reset();
-    });
-  </script>
-</body>
-</html>
+      });
+});
+ </script>
+</head>
 
 <body>
   <header>
@@ -193,9 +201,4 @@
   </footer>
 </body>
 </html>
-  </script>
-</body>
-</html>
-  </script>
-</body>
-</html>
+ 

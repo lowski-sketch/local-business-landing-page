@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local database and customer submissions
+leads.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Local backups
+index_backup.html
+index_repaired.html
+index_old_backup.html

@@ -161,7 +161,7 @@ window.addEventListener("DOMContentLoaded", function () {
                   const service = formData.get("service");
       const details = formData.get("details").trim();
       try {
-        const response = await fetch("https://localpro-api.onrender.com/api/quotes",, {
+     const response = await fetch("https://localpro-api.onrender.com/api/quotes", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"

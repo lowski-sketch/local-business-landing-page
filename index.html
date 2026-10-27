@@ -9,74 +9,6 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 
-    <script>
-window.addEventListener("DOMContentLoaded", function () {
-  const quoteForm = document.getElementById("quote-form");
-  const formMessage = document.getElementById("form-message");
-  const yearElement = document.getElementById("year");
-
-  if (yearElement) {
-    yearElement.textContent = new Date().getFullYear();
-  }
-
-  if (!quoteForm) {
-    console.error("Could not find the quote form. Check its ID.");
-    return;
-  }
-
-  quoteForm.addEventListener("submit", async function (event) {
-      event.preventDefault();
-
-      if (!quoteForm.reportValidity()) {
-        return;
-      }
-
-      const formData = new FormData(quoteForm);
-
-      const name = formData.get("name").trim();
-      const email = formData.get("email").trim();
-      const phone = formData.get("phone").trim();
-      const service = formData.get("service");
-      const details = formData.get("details").trim();
-
-    
-      try {
-        const response = await fetch("http://127.0.0.1:5000/api/quotes", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            name: name,
-            email: email,
-            phone: phone,
-            service: service,
-            details: details
-          })
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || "Could not submit the quote request.");
-        }
-
-        formMessage.textContent = "Your quote request was saved successfully!";
-        quoteForm.reset();
-      } catch (error) {
-        console.error("Quote submission failed:", error);
-        formMessage.textContent =
-          "Could not send your request. Please check that the backend is running and try again.";
-      }
-
-      formMessage.textContent =
-        "Demo request prepared! Your quote-request file should download. This has not been sent to a business.";
-
-      quoteForm.reset();
-      });
-});
- </script>
-</head>
 
 <body>
   <header>
@@ -199,6 +131,68 @@ window.addEventListener("DOMContentLoaded", function () {
     <p>Professional local service, built around your needs.</p>
     <p>&copy; <span id="year">2026</span> LocalPro. Replace with your business details.</p>
   </footer>
+      <script>
+window.addEventListener("DOMContentLoaded", function () {
+  const quoteForm = document.getElementById("quote-form");
+  const formMessage = document.getElementById("form-message");
+  const yearElement = document.getElementById("year");
+
+  if (yearElement) {
+    yearElement.textContent = new Date().getFullYear();
+  }
+
+  if (!quoteForm) {
+    console.error("Could not find the quote form. Check its ID.");
+    return;
+  }
+
+  quoteForm.addEventListener("submit", async function (event) {
+      event.preventDefault();
+
+      if (!quoteForm.reportValidity()) {
+        return;
+      }
+
+      const formData = new FormData(quoteForm);
+
+      const name = formData.get("name").trim();
+      const email = formData.get("email").trim();
+      const phone = formData.get("phone").trim();
+                  const service = formData.get("service");
+      const details = formData.get("details").trim();
+      try {
+        const response = await fetch("http://127.0.0.1:5000/api/quotes", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            name: name,
+            email: email,
+            phone: phone,
+            service: service,
+            details: details
+          })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || "Could not submit the quote request.");
+        }
+
+        formMessage.textContent = "Your quote request was saved successfully!";
+        quoteForm.reset();
+      } catch (error) {
+        console.error("Quote submission failed:", error);
+        formMessage.textContent =
+          "Could not send your request. Please check that the backend is running and try again.";
+      }
+
+         });
+});
+ </script>
+
 </body>
 </html>
- 
+

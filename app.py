@@ -1,4 +1,5 @@
-
+import resend
+import html
 from flask_cors import CORS
 from flask import Flask, request, jsonify
 import sqlite3
@@ -52,6 +53,42 @@ def home():
     })
 
 
+
+def send_quote_notification(name, email, phone, service, details):
+    try:
+        api_key = os.environ.get("RESEND_API_KEY")
+        notification_email = os.environ.get("NOTIFICATION_EMAIL")
+
+        if not api_key or not notification_email:
+            app.logger.warning(
+                "Email notification skipped: configuration is missing."
+            )
+            return
+
+        resend.api_key = api_key
+
+        params = {
+            "from": "LocalPro <onboarding@resend.dev>",
+            "to": [notification_email],
+            "subject": f"New LocalPro quote request: {service}",
+            "html": f"""
+                <h2>New LocalPro Quote Request</h2>
+                <p><strong>Name:</strong> {html.escape(name)}</p>
+                <p><strong>Email:</strong> {html.escape(email)}</p>
+                <p><strong>Phone:</strong> {html.escape(phone or "Not provided")}</p>
+                <p><strong>Service:</strong> {html.escape(service)}</p>
+                <p><strong>Details:</strong> {html.escape(details or "Not provided")}</p>
+            """,
+        }
+
+        resend.Emails.send(params)
+
+    except Exception:
+        app.logger.exception(
+            "Email notification failed; quote processing will continue."
+        )
+
+
 @app.route("/api/quotes", methods=["POST"])
 def create_quote():
     data = request.get_json(silent=True)
@@ -60,7 +97,6 @@ def create_quote():
         return jsonify({
             "error": "Please send a valid JSON request."
         }), 400
-
     name = str(data.get("name", "")).strip()
     email = str(data.get("email", "")).strip()
     phone = str(data.get("phone", "")).strip()
@@ -112,7 +148,13 @@ def create_quote():
             connection.commit()
         finally:
             connection.close()
-
+    send_quote_notification(
+        name=name,
+        email=email,
+        phone=phone,
+        service=service,
+        details=details
+    )
     return jsonify({
         "message": "Your quote request was received.",
         "id": quote_id

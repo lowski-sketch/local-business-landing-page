@@ -223,5 +223,133 @@ class LocalProAPITests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("agree", response.get_json()["error"])
 
+    def test_admin_login_rejects_incorrect_password(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "ADMIN_PASSWORD": "correct-test-password",
+                "FLASK_SECRET_KEY": "test-secret-key",
+            },
+        ):
+            localpro_app.app.config["SECRET_KEY"] = "test-secret-key"
+
+            response = self.client.post(
+                "/api/admin/login",
+                json={"password": "wrong-password"},
+            )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_admin_login_returns_token_with_correct_password(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "ADMIN_PASSWORD": "correct-test-password",
+                "FLASK_SECRET_KEY": "test-secret-key",
+            },
+        ):
+            localpro_app.app.config["SECRET_KEY"] = "test-secret-key"
+
+            response = self.client.post(
+                "/api/admin/login",
+                json={"password": "correct-test-password"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("token", response.get_json())
+
+    def test_provider_list_rejects_request_without_token(self):
+        response = self.client.get("/api/admin/providers")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_provider_list_accepts_valid_admin_token(self):
+        localpro_app.app.config["SECRET_KEY"] = "test-secret-key"
+
+        serializer = localpro_app.get_admin_serializer()
+        token = serializer.dumps({"admin": True})
+
+        response = self.client.get(
+            "/api/admin/providers",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("applications", response.get_json())
+    def test_admin_can_approve_provider(self):
+        provider_response = self.client.post(
+            "/api/providers",
+            json=self.valid_provider(),
+        )
+        application_id = provider_response.get_json()["id"]
+
+        localpro_app.app.config["SECRET_KEY"] = "test-secret-key"
+        token = localpro_app.get_admin_serializer().dumps(
+            {"admin": True}
+        )
+
+        response = self.client.patch(
+            f"/api/admin/providers/{application_id}/status",
+            json={"status": "approved"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json()["application"]["status"],
+            "approved",
+        )
+
+    def test_admin_can_reject_provider(self):
+        provider_response = self.client.post(
+            "/api/providers",
+            json=self.valid_provider(),
+        )
+        application_id = provider_response.get_json()["id"]
+
+        localpro_app.app.config["SECRET_KEY"] = "test-secret-key"
+        token = localpro_app.get_admin_serializer().dumps(
+            {"admin": True}
+        )
+
+        response = self.client.patch(
+            f"/api/admin/providers/{application_id}/status",
+            json={"status": "rejected"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json()["application"]["status"],
+            "rejected",
+        )
+
+    def test_admin_cannot_set_invalid_provider_status(self):
+        provider_response = self.client.post(
+            "/api/providers",
+            json=self.valid_provider(),
+        )
+        application_id = provider_response.get_json()["id"]
+
+        localpro_app.app.config["SECRET_KEY"] = "test-secret-key"
+        token = localpro_app.get_admin_serializer().dumps(
+            {"admin": True}
+        )
+
+        response = self.client.patch(
+            f"/api/admin/providers/{application_id}/status",
+            json={"status": "active"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_provider_status_cannot_be_changed_without_admin_token(self):
+        response = self.client.patch(
+            "/api/admin/providers/1/status",
+            json={"status": "approved"},
+        )
+
+        self.assertEqual(response.status_code, 401)
 if __name__ == "__main__":
     unittest.main(verbosity=2)

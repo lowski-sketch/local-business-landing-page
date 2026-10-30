@@ -1,0 +1,339 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalPro Admin Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            background: #f3f6fa;
+            color: #17243b;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        .admin-container {
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        .admin-card {
+            background: white;
+            padding: 28px;
+            border-radius: 12px;
+            box-shadow: 0 4px 18px rgba(0,0,0,.07);
+            margin-bottom: 24px;
+        }
+
+        .admin-card h1, .admin-card h2 {
+            margin-top: 0;
+        }
+
+        input {
+            width: 100%;
+            padding: 13px;
+            margin: 10px 0;
+            border: 1px solid #ccd4df;
+            border-radius: 7px;
+            box-sizing: border-box;
+        }
+
+        button {
+            padding: 11px 18px;
+            border: 0;
+            border-radius: 7px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .primary-button {
+            background: #087f68;
+            color: white;
+        }
+
+        .approve-button {
+            background: #087f68;
+            color: white;
+            margin-right: 8px;
+        }
+
+        .reject-button {
+            background: #a83232;
+            color: white;
+        }
+
+        .application {
+            border: 1px solid #dce3ec;
+            padding: 20px;
+            border-radius: 9px;
+            margin-top: 16px;
+        }
+
+        .status {
+            font-weight: bold;
+            text-transform: capitalize;
+        }
+
+        .message {
+            margin-top: 12px;
+            font-weight: bold;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .application p {
+            overflow-wrap: anywhere;
+        }
+
+        @media (max-width: 600px) {
+            .admin-container {
+                margin: 15px auto;
+                padding: 12px;
+            }
+
+            .admin-card {
+                padding: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<main class="admin-container">
+
+    <section class="admin-card" id="login-section">
+        <h1>LocalPro Admin</h1>
+        <p>Secure administrator login.</p>
+
+        <form id="login-form">
+            <label for="admin-password">Admin Password</label>
+            <input
+                type="password"
+                id="admin-password"
+                autocomplete="current-password"
+                required
+            >
+            <button class="primary-button" type="submit">
+                Log In
+            </button>
+        </form>
+
+        <p id="login-message" class="message" role="status"></p>
+    </section>
+
+    <section class="hidden" id="dashboard-section">
+        <div class="admin-card">
+            <h1>Provider Management</h1>
+            <p>Review and manage LocalPro provider applications.</p>
+            <button class="primary-button" id="refresh-button">
+                Refresh Applications
+            </button>
+            <button class="reject-button" id="logout-button">
+                Log Out
+            </button>
+            <p id="dashboard-message" class="message" role="status"></p>
+        </div>
+
+        <div class="admin-card">
+            <h2>Applications</h2>
+            <div id="applications-list">
+                Loading applications...
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<script>
+    const API_BASE = "https://localpro-api.onrender.com";
+    let adminToken = null;
+
+    const loginForm = document.getElementById("login-form");
+    const loginSection = document.getElementById("login-section");
+    const dashboardSection = document.getElementById("dashboard-section");
+    const loginMessage = document.getElementById("login-message");
+    const dashboardMessage = document.getElementById("dashboard-message");
+    const applicationsList = document.getElementById("applications-list");
+
+    loginForm.addEventListener("submit", async function(event) {
+        event.preventDefault();
+
+        loginMessage.textContent = "Checking login...";
+
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/login`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    password: document.getElementById("admin-password").value
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Login failed.");
+            }
+
+            adminToken = data.token;
+            document.getElementById("admin-password").value = "";
+
+            loginSection.classList.add("hidden");
+            dashboardSection.classList.remove("hidden");
+
+            await loadApplications();
+
+        } catch (error) {
+            loginMessage.textContent = error.message;
+        }
+    });
+
+    async function loadApplications() {
+        applicationsList.textContent = "Loading applications...";
+        dashboardMessage.textContent = "";
+
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/providers`, {
+                headers: {
+                    "Authorization": `Bearer ${adminToken}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    logout();
+                }
+                throw new Error(data.error || "Could not load applications.");
+            }
+
+            applicationsList.replaceChildren();
+
+            if (!data.applications.length) {
+                applicationsList.textContent = "No provider applications yet.";
+                return;
+            }
+
+            data.applications.forEach(application => {
+                const card = document.createElement("article");
+                card.className = "application";
+
+                const heading = document.createElement("h3");
+                heading.textContent = application.business_name;
+                card.appendChild(heading);
+
+                const fields = [
+                    ["Contact", application.contact_name],
+                    ["Email", application.email],
+                    ["Phone", application.phone],
+                    ["Address", application.business_address],
+                    ["Service area", application.service_area],
+                    ["Services", application.services],
+                    ["Customer types", application.customer_types],
+                    ["Years in business", application.years_in_business],
+                    ["Insurance", application.insurance_info],
+                    ["Licenses", application.license_info],
+                    ["Website", application.website],
+                    ["Availability", application.availability]
+                ];
+
+                fields.forEach(([label, value]) => {
+                    const paragraph = document.createElement("p");
+                    paragraph.textContent = `${label}: ${value || "Not provided"}`;
+                    card.appendChild(paragraph);
+                });
+
+                const status = document.createElement("p");
+                status.className = "status";
+                status.textContent = `Status: ${application.status}`;
+                card.appendChild(status);
+
+                if (application.status === "pending") {
+                    const approveButton = document.createElement("button");
+                    approveButton.className = "approve-button";
+                    approveButton.textContent = "Approve";
+                    approveButton.addEventListener("click", () => {
+                        updateStatus(application.id, "approved");
+                    });
+
+                    const rejectButton = document.createElement("button");
+                    rejectButton.className = "reject-button";
+                    rejectButton.textContent = "Reject";
+                    rejectButton.addEventListener("click", () => {
+                        updateStatus(application.id, "rejected");
+                    });
+
+                    card.appendChild(approveButton);
+                    card.appendChild(rejectButton);
+                }
+
+                applicationsList.appendChild(card);
+            });
+
+        } catch (error) {
+            applicationsList.textContent = error.message;
+        }
+    }
+
+    async function updateStatus(applicationId, status) {
+        const confirmed = window.confirm(
+            `Are you sure you want to ${status} this provider?`
+        );
+
+        if (!confirmed) return;
+
+        try {
+            const response = await fetch(
+                `${API_BASE}/api/admin/providers/${applicationId}/status`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${adminToken}`
+                    },
+                    body: JSON.stringify({ status })
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Could not update provider.");
+            }
+
+            dashboardMessage.textContent = data.message;
+            await loadApplications();
+
+        } catch (error) {
+            dashboardMessage.textContent = error.message;
+        }
+    }
+
+    function logout() {
+        adminToken = null;
+        dashboardSection.classList.add("hidden");
+        loginSection.classList.remove("hidden");
+        applicationsList.replaceChildren();
+        dashboardMessage.textContent = "";
+        loginMessage.textContent = "You have been logged out.";
+    }
+
+    document.getElementById("refresh-button").addEventListener(
+        "click", loadApplications
+    );
+
+    document.getElementById("logout-button").addEventListener(
+        "click", logout
+    );
+</script>
+
+</body>
+</html>

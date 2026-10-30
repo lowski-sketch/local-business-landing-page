@@ -1,18 +1,103 @@
 import resend
 import html
+import hmac
 from flask_cors import CORS
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session
 import sqlite3
 import os
 import psycopg
 from pathlib import Path
 import re
+import time
+from functools import wraps
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 app = Flask(__name__)
-CORS(app)
+
+app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY")
+# Temporary admin login protection
+LOGIN_ATTEMPTS = {}
+LOGIN_LIMIT = 5
+LOGIN_WINDOW = 900  # 15 minutes
+CORS(
+    app,
+    resources={
+        r"/api/*": {
+            "origins": [
+                "https://localpro.lotpod.net"
+            ]
+        }
+    },
+   methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"]
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE = BASE_DIR / "leads.db"
+def check_login_rate_limit(ip_address):
+    current_time = time.time()
+
+    attempts = LOGIN_ATTEMPTS.get(ip_address, [])
+
+    attempts = [
+        attempt
+        for attempt in attempts
+        if current_time - attempt < LOGIN_WINDOW
+    ]
+
+    LOGIN_ATTEMPTS[ip_address] = attempts
+
+    return len(attempts) < LOGIN_LIMIT
+
+
+def record_failed_login(ip_address):
+    current_time = time.time()
+
+    attempts = LOGIN_ATTEMPTS.get(ip_address, [])
+
+    attempts.append(current_time)
+
+    LOGIN_ATTEMPTS[ip_address] = attempts
+def get_admin_serializer():
+    secret_key = app.config.get("SECRET_KEY")
+
+    if not secret_key:
+        return None
+
+    return URLSafeTimedSerializer(
+        secret_key,
+        salt="localpro-admin"
+    )
+
+
+def require_admin_token(view_function):
+    @wraps(view_function)
+    def wrapped(*args, **kwargs):
+        authorization = request.headers.get("Authorization", "")
+
+        if not authorization.startswith("Bearer "):
+            return jsonify({"error": "Admin login required."}), 401
+
+        token = authorization.replace("Bearer ", "", 1)
+        serializer = get_admin_serializer()
+
+        if serializer is None:
+            return jsonify({"error": "Admin security is not configured."}), 503
+
+        try:
+            token_data = serializer.loads(token, max_age=3600)
+        except (BadSignature, SignatureExpired):
+            return jsonify({"error": "Your admin login has expired. Please log in again."}), 401
+
+        if not isinstance(token_data, dict):
+            return jsonify({"error": "Unauthorized."}), 401
+
+        if token_data.get("admin") is not True:
+            return jsonify({"error": "Unauthorized."}), 401
+
+        return view_function(*args, **kwargs)
+
+    return wrapped
 
 
 def initialize_database():
@@ -94,6 +179,51 @@ def initialize_provider_database():
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+@app.route("/api/admin/login", methods=["POST"])
+def admin_login():
+    ip_address = request.remote_addr or "unknown"
+
+    if not check_login_rate_limit(ip_address):
+        return jsonify({
+            "error": "Too many failed login attempts. Try again in 15 minutes."
+        }), 429
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({
+            "error": "Please send a valid login request."
+        }), 400
+
+    password = data.get("password")
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+
+    if not admin_password or not app.config.get("SECRET_KEY"):
+        app.logger.error("Admin login is not configured.")
+        return jsonify({
+            "error": "Admin login is not configured."
+        }), 503
+
+    if not isinstance(password, str) or not hmac.compare_digest(
+        password,
+        admin_password
+    ):
+        record_failed_login(ip_address)
+
+        return jsonify({
+            "error": "Incorrect admin password."
+        }), 401
+
+    LOGIN_ATTEMPTS.pop(ip_address, None)
+
+    serializer = get_admin_serializer()
+    token = serializer.dumps({"admin": True})
+
+    return jsonify({
+        "message": "Admin login successful.",
+        "token": token
+    }), 200
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({
@@ -362,6 +492,130 @@ def create_provider_application():
         "id": application_id,
         "status": "pending"
     }), 201
+@app.route("/api/admin/providers", methods=["GET"])
+@require_admin_token
+def get_provider_applications():
+    database_url = os.environ.get("DATABASE_URL")
+
+    if database_url:
+        with psycopg.connect(database_url) as connection:
+            cursor = connection.execute("""
+                SELECT
+                    id,
+                    business_name,
+                    contact_name,
+                    email,
+                    phone,
+                    business_address,
+                    service_area,
+                    services,
+                    customer_types,
+                    years_in_business,
+                    insurance_info,
+                    license_info,
+                    website,
+                    availability,
+                    status,
+                    created_at
+                FROM provider_applications
+                ORDER BY created_at DESC
+            """)
+
+            columns = [column.name for column in cursor.description]
+            applications = [
+                dict(zip(columns, row))
+                for row in cursor.fetchall()
+            ]
+    else:
+        connection = sqlite3.connect(DATABASE)
+        connection.row_factory = sqlite3.Row
+
+        try:
+            rows = connection.execute("""
+                SELECT *
+                FROM provider_applications
+                ORDER BY created_at DESC
+            """).fetchall()
+
+            applications = [dict(row) for row in rows]
+        finally:
+            connection.close()
+
+    for application in applications:
+        if application.get("created_at") is not None:
+            application["created_at"] = str(application["created_at"])
+
+    return jsonify({"applications": applications}), 200
+@app.route("/api/admin/providers/<int:application_id>/status", methods=["PATCH"])
+@require_admin_token
+def update_provider_status(application_id):
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({"error": "Please send a valid JSON request."}), 400
+
+    new_status = data.get("status")
+
+    if new_status not in ("approved", "rejected"):
+        return jsonify({
+            "error": "Status must be approved or rejected."
+        }), 400
+
+    database_url = os.environ.get("DATABASE_URL")
+
+    if database_url:
+        with psycopg.connect(database_url) as connection:
+            cursor = connection.execute("""
+                UPDATE provider_applications
+                SET status = %s
+                WHERE id = %s
+                RETURNING id, business_name, status
+            """, (new_status, application_id))
+
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({
+                    "error": "Provider application not found."
+                }), 404
+
+            result = {
+                "id": row[0],
+                "business_name": row[1],
+                "status": row[2]
+            }
+    else:
+        connection = sqlite3.connect(DATABASE)
+        connection.row_factory = sqlite3.Row
+
+        try:
+            cursor = connection.execute("""
+                UPDATE provider_applications
+                SET status = ?
+                WHERE id = ?
+            """, (new_status, application_id))
+
+            if cursor.rowcount == 0:
+                return jsonify({
+                    "error": "Provider application not found."
+                }), 404
+
+            connection.commit()
+
+            row = connection.execute("""
+                SELECT id, business_name, status
+                FROM provider_applications
+                WHERE id = ?
+            """, (application_id,)).fetchone()
+
+            result = dict(row)
+        finally:
+            connection.close()
+
+    return jsonify({
+        "message": f"Provider application {new_status}.",
+        "application": result
+    }), 200
 initialize_database()
 initialize_provider_database()
 if __name__ == "__main__":

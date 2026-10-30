@@ -68,7 +68,7 @@ def send_quote_notification(name, email, phone, service, details):
         resend.api_key = api_key
 
         params = {
-            "from": "LocalPro <onboarding@resend.dev>",
+            "from": "LocalPro <quotes@send.lotpod.net>",
             "to": [notification_email],
             "subject": f"New LocalPro quote request: {service}",
             "html": f"""

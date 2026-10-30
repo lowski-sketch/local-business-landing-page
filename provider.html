@@ -1,0 +1,131 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Become a LocalPro Provider</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>LocalPro</h1>
+            <p>Grow your local service business with us.</p>
+            <a href="index.html">Back to Customer Home</a>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="form-card">
+            <h2>Apply to Become a Provider</h2>
+            <p>
+                Tell us about your business and the services you provide.
+                Applications are reviewed before providers can receive customer leads.
+            </p>
+
+            <form id="provider-form">
+                <label for="business_name">Business name *</label>
+                <input id="business_name" name="business_name" type="text" required maxlength="150">
+
+                <label for="contact_name">Your name *</label>
+                <input id="contact_name" name="contact_name" type="text" required maxlength="120">
+
+                <label for="email">Business email *</label>
+                <input id="email" name="email" type="email" required maxlength="254">
+
+                <label for="phone">Business phone *</label>
+                <input id="phone" name="phone" type="tel" required maxlength="40">
+
+                <label for="business_address">Business address</label>
+                <input id="business_address" name="business_address" type="text" maxlength="250">
+
+                <label for="service_area">Cities or ZIP codes you serve *</label>
+                <textarea id="service_area" name="service_area" required maxlength="1000"
+                    placeholder="Example: Berkeley, Elmhurst, Westchester"></textarea>
+
+                <label for="services">Services you offer *</label>
+                <textarea id="services" name="services" required maxlength="1500"
+                    placeholder="Example: Snow removal, lawn care, gutter cleaning"></textarea>
+
+                <label for="customer_types">What customers do you serve?</label>
+                <select id="customer_types" name="customer_types">
+                    <option value="">Select one</option>
+                    <option value="Residential">Residential</option>
+                    <option value="Commercial">Commercial</option>
+                    <option value="Both">Both residential and commercial</option>
+                </select>
+
+                <label for="years_in_business">Years in business</label>
+                <input id="years_in_business" name="years_in_business" type="text" maxlength="50"
+                    placeholder="Example: 5 years">
+
+                <label for="insurance_info">Insurance information</label>
+                <textarea id="insurance_info" name="insurance_info" maxlength="1000"
+                    placeholder="Tell us whether your business carries liability insurance. Do not enter policy numbers."></textarea>
+
+                <label for="license_info">License or registration information, if applicable</label>
+                <textarea id="license_info" name="license_info" maxlength="1000"></textarea>
+
+                <label for="website">Website or business social media</label>
+                <input id="website" name="website" type="text" maxlength="250"
+                    placeholder="https://example.com">
+
+                <label for="availability">Availability</label>
+                <textarea id="availability" name="availability" maxlength="1000"
+                    placeholder="Example: Weekdays, weekends, emergency snow removal"></textarea>
+
+                <label class="checkbox-label">
+                    <input type="checkbox" id="provider_agreement" name="provider_agreement" value="yes" required>
+                    I confirm that the information above is accurate and agree that LocalPro may contact me about this application.
+                </label>
+
+                <button type="submit">Submit Provider Application</button>
+            </form>
+
+            <p id="provider-message" role="status" aria-live="polite"></p>
+        </section>
+    </main>
+
+    <script>
+        const providerForm = document.getElementById("provider-form");
+        const providerMessage = document.getElementById("provider-message");
+
+        providerForm.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            const formData = new FormData(providerForm);
+            const application = Object.fromEntries(formData.entries());
+
+            providerMessage.textContent = "Submitting your application...";
+            
+            try {
+                const response = await fetch(
+                    "https://localpro-api.onrender.com/api/providers",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(application)
+                    }
+                );
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || "Unable to submit your application.");
+                }
+
+                providerMessage.textContent =
+                    "Thank you! Your application was received and is pending review.";
+
+                providerForm.reset();
+            } catch (error) {
+                providerMessage.textContent =
+                    error.message || "Something went wrong. Please try again.";
+            }
+        });
+    </script>
+</body>
+</html>

@@ -375,3 +375,139 @@ footer p {
     transition: none !important;
   }
 }
+
+/* LocalPro Provider Signup Page */
+
+.form-card {
+    max-width: 750px;
+    margin: 40px auto;
+    padding: 30px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+}
+
+.form-card h2 {
+    color: #142b45;
+    margin-bottom: 12px;
+}
+
+.form-card p {
+    line-height: 1.6;
+    color: #555555;
+}
+
+#provider-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+#provider-form label {
+    color: #142b45;
+    font-weight: 600;
+    margin-top: 10px;
+}
+
+#provider-form input,
+#provider-form select,
+#provider-form textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+#provider-form textarea {
+    min-height: 90px;
+    resize: vertical;
+}
+
+#provider-form .checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-weight: normal;
+    line-height: 1.5;
+    margin: 15px 0;
+}
+
+#provider-form .checkbox-label input {
+    width: auto;
+    margin-top: 4px;
+}
+
+#provider-form button {
+    background: #21a675;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 14px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+#provider-form button:hover {
+    background: #18845c;
+}
+
+#provider-message {
+    margin-top: 20px;
+    font-weight: bold;
+}
+
+@media (max-width: 600px) {
+    .form-card {
+        margin: 20px 10px;
+        padding: 20px;
+    }
+}
+
+/* LocalPro provider page colors */
+
+body:has(#provider-form) {
+    background: #f1f5f9;
+}
+
+body:has(#provider-form) header {
+    background: #142b45;
+    color: #ffffff;
+    padding: 30px 20px;
+}
+
+body:has(#provider-form) header h1 {
+    color: #21a675;
+}
+
+body:has(#provider-form) header p,
+body:has(#provider-form) header a {
+    color: #ffffff;
+}
+
+body:has(#provider-form) .form-card {
+    border-top: 6px solid #21a675;
+}
+
+#provider-form input,
+#provider-form select,
+#provider-form textarea {
+    background: #ffffff;
+    color: #142b45;
+}
+
+#provider-form input:focus,
+#provider-form select:focus,
+#provider-form textarea:focus {
+    outline: 2px solid #21a675;
+    border-color: #21a675;
+}
+
+#provider-form button {
+    background: #21a675;
+    color: #ffffff;
+}

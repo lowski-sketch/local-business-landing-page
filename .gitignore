@@ -15,3 +15,9 @@ index_backup.html
 index_repaired.html
 index_old_backup.html
 index_before_cleanup.html
+# Private files
+API-key.txt
+live-website-link.txt
+
+# Signup form backups
+*_before_signup_forms.*

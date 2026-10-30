@@ -25,6 +25,26 @@ class LocalProAPITests(unittest.TestCase):
                     details TEXT,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
+            """)            
+            connection.execute("""
+                CREATE TABLE provider_applications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    business_name TEXT NOT NULL,
+                    contact_name TEXT NOT NULL,
+                    email TEXT NOT NULL,
+                    phone TEXT NOT NULL,
+                    business_address TEXT,
+                    service_area TEXT NOT NULL,
+                    services TEXT NOT NULL,
+                    customer_types TEXT,
+                    years_in_business TEXT,
+                    insurance_info TEXT,
+                    license_info TEXT,
+                    website TEXT,
+                    availability TEXT,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
             """)
             connection.commit()
         finally:
@@ -108,6 +128,100 @@ class LocalProAPITests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("valid JSON", response.get_json()["error"])
 
+
+    def valid_provider(self):
+        return {
+            "business_name": "Test Home Services",
+            "contact_name": "Alex Provider",
+            "email": "provider@example.com",
+            "phone": "555-0200",
+            "business_address": "123 Main Street",
+            "service_area": "Berkeley, Elmhurst",
+            "services": "Snow removal, lawn care",
+            "customer_types": "Residential and commercial",
+            "years_in_business": "5 years",
+            "insurance_info": "General liability insurance",
+            "license_info": "Will provide applicable licenses",
+            "website": "https://example.com",
+            "availability": "Weekdays and weekends",
+	    "provider_agreement": "yes",
+        }
+
+    def test_valid_provider_application_is_saved_as_pending(self):
+        response = self.client.post(
+            "/api/providers",
+            json=self.valid_provider(),
+        )
+
+        self.assertEqual(response.status_code, 201)
+        result = response.get_json()
+        self.assertEqual(result["status"], "pending")
+
+        connection = sqlite3.connect(self.database_path)
+        try:
+            row = connection.execute("""
+                SELECT business_name, email, service_area, status
+                FROM provider_applications
+                WHERE id = ?
+            """, (result["id"],)).fetchone()
+        finally:
+            connection.close()
+
+        self.assertEqual(
+            row,
+            (
+                "Test Home Services",
+                "provider@example.com",
+                "Berkeley, Elmhurst",
+                "pending",
+            ),
+        )
+
+    def test_provider_application_missing_required_field_is_rejected(self):
+        provider = self.valid_provider()
+        provider["business_name"] = ""
+
+        response = self.client.post(
+            "/api/providers",
+            json=provider,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("required", response.get_json()["error"])
+
+    def test_provider_application_invalid_email_is_rejected(self):
+        provider = self.valid_provider()
+        provider["email"] = "not-an-email"
+
+        response = self.client.post(
+            "/api/providers",
+            json=provider,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("valid email", response.get_json()["error"])
+
+    def test_provider_application_non_json_request_is_rejected(self):
+        response = self.client.post(
+            "/api/providers",
+            data="this is not JSON",
+            content_type="text/plain",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("valid JSON", response.get_json()["error"])
+
+    def test_provider_application_without_agreement_is_rejected(self):
+        provider = self.valid_provider()
+        provider.pop("provider_agreement")
+
+        response = self.client.post(
+            "/api/providers",
+            json=provider,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("agree", response.get_json()["error"])
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

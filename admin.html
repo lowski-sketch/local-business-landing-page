@@ -100,7 +100,71 @@
                 padding: 18px;
             }
         }
-    </style>
+.application-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.stat-card {
+    background: #f3f6f8;
+    border: 1px solid #dce3e8;
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.stat-card span {
+    display: block;
+    color: #52616b;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+.stat-card strong {
+    font-size: 25px;
+    color: #142b3a;
+}
+
+.application-filters {
+    display: flex;
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.application-filters input,
+.application-filters select {
+    padding: 12px;
+    border: 1px solid #ccd5dc;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.application-filters input {
+    flex: 1;
+    min-width: 0;
+}
+
+.application-filters select {
+    min-width: 180px;
+    background: white;
+}
+
+@media (max-width: 650px) {
+    .application-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .application-filters {
+        flex-direction: column;
+    }
+
+    .application-filters select {
+        width: 100%;
+    }
+
+    }
+   </style>
 </head>
 <body>
 
@@ -137,14 +201,50 @@
                 Log Out
             </button>
             <p id="dashboard-message" class="message" role="status"></p>
+       <div class="admin-card">
+    <h2>Provider Applications</h2>
+
+    <div class="application-stats">
+        <div class="stat-card">
+            <span>All Applications</span>
+            <strong id="count-all">0</strong>
         </div>
 
-        <div class="admin-card">
-            <h2>Applications</h2>
-            <div id="applications-list">
-                Loading applications...
-            </div>
+        <div class="stat-card">
+            <span>Pending</span>
+            <strong id="count-pending">0</strong>
         </div>
+
+        <div class="stat-card">
+            <span>Approved</span>
+            <strong id="count-approved">0</strong>
+        </div>
+
+        <div class="stat-card">
+            <span>Rejected</span>
+            <strong id="count-rejected">0</strong>
+        </div>
+    </div>
+
+    <div class="application-filters">
+        <input
+            type="text"
+            id="application-search"
+            placeholder="Search business, contact, service area..."
+        >
+
+        <select id="status-filter">
+            <option value="all">All Applications</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+        </select>
+    </div>
+
+    <div id="applications-list">
+        Loading applications...
+    </div>
+</div>
     </section>
 
 </main>
@@ -152,6 +252,7 @@
 <script>
     const API_BASE = "https://localpro-api.onrender.com";
     let adminToken = null;
+    let allApplications = [];
 
     const loginForm = document.getElementById("login-form");
     const loginSection = document.getElementById("login-section");
@@ -195,95 +296,157 @@
         }
     });
 
-    async function loadApplications() {
-        applicationsList.textContent = "Loading applications...";
-        dashboardMessage.textContent = "";
 
-        try {
-            const response = await fetch(`${API_BASE}/api/admin/providers`, {
-                headers: {
-                    "Authorization": `Bearer ${adminToken}`
-                }
-            });
+function renderApplications() {
+    applicationsList.replaceChildren();
 
-            const data = await response.json();
+    const searchText = document
+        .getElementById("application-search")
+        .value.trim().toLowerCase();
 
-            if (!response.ok) {
-                if (response.status === 401) {
-                    logout();
-                }
-                throw new Error(data.error || "Could not load applications.");
-            }
+    const selectedStatus = document
+        .getElementById("status-filter")
+        .value;
 
-            applicationsList.replaceChildren();
+    // Update application counts.
+    document.getElementById("count-all").textContent =
+        allApplications.length;
 
-            if (!data.applications.length) {
-                applicationsList.textContent = "No provider applications yet.";
-                return;
-            }
+    document.getElementById("count-pending").textContent =
+        allApplications.filter(app => app.status === "pending").length;
 
-            data.applications.forEach(application => {
-                const card = document.createElement("article");
-                card.className = "application";
+    document.getElementById("count-approved").textContent =
+        allApplications.filter(app => app.status === "approved").length;
 
-                const heading = document.createElement("h3");
-                heading.textContent = application.business_name;
-                card.appendChild(heading);
+    document.getElementById("count-rejected").textContent =
+        allApplications.filter(app => app.status === "rejected").length;
 
-                const fields = [
-                    ["Contact", application.contact_name],
-                    ["Email", application.email],
-                    ["Phone", application.phone],
-                    ["Address", application.business_address],
-                    ["Service area", application.service_area],
-                    ["Services", application.services],
-                    ["Customer types", application.customer_types],
-                    ["Years in business", application.years_in_business],
-                    ["Insurance", application.insurance_info],
-                    ["Licenses", application.license_info],
-                    ["Website", application.website],
-                    ["Availability", application.availability]
-                ];
+    // Apply search and status filters.
+    const filteredApplications = allApplications.filter(application => {
+        const matchesStatus =
+            selectedStatus === "all" ||
+            application.status === selectedStatus;
 
-                fields.forEach(([label, value]) => {
-                    const paragraph = document.createElement("p");
-                    paragraph.textContent = `${label}: ${value || "Not provided"}`;
-                    card.appendChild(paragraph);
-                });
+        const searchableText = [
+            application.business_name,
+            application.contact_name,
+            application.service_area,
+            application.services
+        ].join(" ").toLowerCase();
 
-                const status = document.createElement("p");
-                status.className = "status";
-                status.textContent = `Status: ${application.status}`;
-                card.appendChild(status);
+        const matchesSearch = searchableText.includes(searchText);
 
-                if (application.status === "pending") {
-                    const approveButton = document.createElement("button");
-                    approveButton.className = "approve-button";
-                    approveButton.textContent = "Approve";
-                    approveButton.addEventListener("click", () => {
-                        updateStatus(application.id, "approved");
-                    });
+        return matchesStatus && matchesSearch;
+    });
 
-                    const rejectButton = document.createElement("button");
-                    rejectButton.className = "reject-button";
-                    rejectButton.textContent = "Reject";
-                    rejectButton.addEventListener("click", () => {
-                        updateStatus(application.id, "rejected");
-                    });
-
-                    card.appendChild(approveButton);
-                    card.appendChild(rejectButton);
-                }
-
-                applicationsList.appendChild(card);
-            });
-
-        } catch (error) {
-            applicationsList.textContent = error.message;
-        }
+    if (filteredApplications.length === 0) {
+        applicationsList.textContent = "No matching applications found.";
+        return;
     }
 
-    async function updateStatus(applicationId, status) {
+    filteredApplications.forEach(application => {
+        const card = document.createElement("article");
+        card.className = "application";
+
+        const heading = document.createElement("h3");
+        heading.textContent = application.business_name;
+        card.appendChild(heading);
+
+        const fields = [
+            ["Contact", application.contact_name],
+            ["Email", application.email],
+            ["Phone", application.phone],
+            ["Address", application.business_address],
+            ["Service area", application.service_area],
+            ["Services", application.services],
+            ["Customer types", application.customer_types],
+            ["Years in business", application.years_in_business],
+            ["Insurance", application.insurance_info],
+            ["Licenses", application.license_info],
+            ["Website", application.website],
+            ["Availability", application.availability]
+        ];
+
+        fields.forEach(([label, value]) => {
+            const paragraph = document.createElement("p");
+            paragraph.textContent = `${label}: ${value || "Not provided"}`;
+            card.appendChild(paragraph);
+        });
+
+        // Flag applications that list snow-related services.
+        const snowKeywords = /snow|plow|ice|salting|shovel/i;
+
+        if (snowKeywords.test(application.services || "")) {
+            const snowLabel = document.createElement("p");
+            snowLabel.textContent = "Snow-related services listed";
+            snowLabel.className = "status";
+            card.appendChild(snowLabel);
+        }
+
+        const status = document.createElement("p");
+        status.className = "status";
+        status.textContent = `Status: ${application.status}`;
+        card.appendChild(status);
+
+        if (application.status === "pending") {
+            const approveButton = document.createElement("button");
+            approveButton.className = "approve-button";
+            approveButton.textContent = "Approve";
+
+            approveButton.addEventListener("click", () => {
+                updateStatus(application.id, "approved");
+            });
+
+            const rejectButton = document.createElement("button");
+            rejectButton.className = "reject-button";
+            rejectButton.textContent = "Reject";
+
+            rejectButton.addEventListener("click", () => {
+                updateStatus(application.id, "rejected");
+            });
+
+            card.appendChild(approveButton);
+            card.appendChild(rejectButton);
+        }
+
+        applicationsList.appendChild(card);
+    });
+}
+
+
+async function loadApplications() {
+    applicationsList.textContent = "Loading applications...";
+    dashboardMessage.textContent = "";
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/providers`, {
+            headers: {
+                "Authorization": `Bearer ${adminToken}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                logout();
+            }
+
+            throw new Error(data.error || "Could not load applications.");
+        }
+
+        allApplications = Array.isArray(data.applications)
+            ? data.applications
+            : [];
+
+        renderApplications();
+
+    } catch (error) {
+        applicationsList.textContent = error.message;
+
+}
+}
+async function updateStatus(applicationId, status) {
         const confirmed = window.confirm(
             `Are you sure you want to ${status} this provider?`
         );
@@ -325,6 +488,14 @@
         dashboardMessage.textContent = "";
         loginMessage.textContent = "You have been logged out.";
     }
+
+        document.getElementById("application-search").addEventListener(
+        "input", renderApplications
+    );
+
+    document.getElementById("status-filter").addEventListener(
+        "change", renderApplications
+    );
 
     document.getElementById("refresh-button").addEventListener(
         "click", loadApplications

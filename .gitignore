@@ -21,3 +21,9 @@ live-website-link.txt
 
 # Signup form backups
 *_before_signup_forms.*
+# Admin dashboard backups
+admin_before_*.html
+app_before_*.py
+
+# Temporary JavaScript syntax-check file
+admin_check.js

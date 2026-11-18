@@ -193,7 +193,7 @@
     <section class="hidden" id="dashboard-section">
         <div class="admin-card">
             <h1>Provider Management</h1>
-            <p>Review and manage LocalPro provider applications.</p>
+            <p>Live provider applications · Read-only preview</p>
             <button class="primary-button" id="refresh-button">
                 Refresh Applications
             </button>
@@ -245,57 +245,338 @@
         Loading applications...
     </div>
 </div>
+<div class="admin-card" id="customer-leads-section">
+    <h2>Customer Leads</h2>
+    <p>Manage incoming customer requests and provider assignments.</p>
+
+    <div class="application-stats">
+        <div class="stat-card">
+            <span>All Leads</span>
+            <strong id="lead-count-all">0</strong>
+        </div>
+
+        <div class="stat-card">
+            <span>New</span>
+            <strong id="lead-count-new">0</strong>
+        </div>
+
+        <div class="stat-card">
+            <span>Contacted</span>
+            <strong id="lead-count-contacted">0</strong>
+        </div>
+
+        <div class="stat-card">
+            <span>Matched</span>
+            <strong id="lead-count-matched">0</strong>
+        </div>
+
+        <div class="stat-card">
+            <span>Completed</span>
+            <strong id="lead-count-completed">0</strong>
+        </div>
+    </div>
+
+    <div class="application-filters">
+        <input
+            type="text"
+            id="lead-search"
+            placeholder="Search customer, ZIP code, or service..."
+        >
+
+        <select id="lead-status-filter">
+            <option value="all">All Leads</option>
+            <option value="new">New</option>
+            <option value="contacted">Contacted</option>
+            <option value="matched">Matched</option>
+            <option value="completed">Completed</option>
+        </select>
+    </div>
+
+    <button class="primary-button" id="refresh-leads-button">
+        Refresh Customer Leads
+    </button>
+
+    <p id="lead-message" class="message" role="status"></p>
+
+    <div id="customer-leads-list">
+        Log in to load customer leads.
+    </div>
+</div>
+
     </section>
 
 </main>
 
 <script>
-    const API_BASE = "https://localpro-api.onrender.com";
-    let adminToken = null;
-    let allApplications = [];
 
-    const loginForm = document.getElementById("login-form");
-    const loginSection = document.getElementById("login-section");
-    const dashboardSection = document.getElementById("dashboard-section");
-    const loginMessage = document.getElementById("login-message");
-    const dashboardMessage = document.getElementById("dashboard-message");
-    const applicationsList = document.getElementById("applications-list");
+const API_BASE = "https://localpro-api.onrender.com";
 
-    loginForm.addEventListener("submit", async function(event) {
-        event.preventDefault();
+let localLeads = [];
+let localProviders = [];
+let adminToken = null;
+let allApplications = [];
 
-        loginMessage.textContent = "Checking login...";
+const loginForm = document.getElementById("login-form");
+const loginSection = document.getElementById("login-section");
+const dashboardSection = document.getElementById("dashboard-section");
+const loginMessage = document.getElementById("login-message");
+const dashboardMessage = document.getElementById("dashboard-message");
+const applicationsList = document.getElementById("applications-list");
 
-        try {
-            const response = await fetch(`${API_BASE}/api/admin/login`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    password: document.getElementById("admin-password").value
-                })
-            });
+loginForm.addEventListener("submit", async function(event) {
+    event.preventDefault();
+    loginMessage.textContent = "Checking login...";
 
-            const data = await response.json();
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/login`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                password: document.getElementById("admin-password").value
+            })
+        });
 
-            if (!response.ok) {
-                throw new Error(data.error || "Login failed.");
-            }
-
-            adminToken = data.token;
-            document.getElementById("admin-password").value = "";
-
-            loginSection.classList.add("hidden");
-            dashboardSection.classList.remove("hidden");
-
-            await loadApplications();
-
-        } catch (error) {
-            loginMessage.textContent = error.message;
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || "Login failed.");
         }
+
+        adminToken = data.token;
+        document.getElementById("admin-password").value = "";
+        loginSection.classList.add("hidden");
+        dashboardSection.classList.remove("hidden");
+
+        await loadApplications();
+        await loadCustomerLeads();
+        await loadLocalProviders();
+
+    } catch (error) {
+        loginMessage.textContent = error.message;
+    }
+});
+
+async function loadCustomerLeads() {
+    const leadsList = document.getElementById("customer-leads-list");
+    const message = document.getElementById("lead-message");
+
+    leadsList.textContent = "Loading customer leads...";
+    message.textContent = "";
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/quotes`, {
+            headers: {"Authorization": `Bearer ${adminToken}`}
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            if (response.status === 401) logout();
+            throw new Error(data.error || "Could not load customer leads.");
+        }
+
+        localLeads = Array.isArray(data.leads) ? data.leads : [];
+        renderCustomerLeads();
+
+    } catch (error) {
+        leadsList.textContent = error.message;
+    }
+}
+
+async function loadLocalProviders() {
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/providers`, {
+            headers: {"Authorization": `Bearer ${adminToken}`}
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            if (response.status === 401) logout();
+            throw new Error(data.error || "Could not load approved providers.");
+        }
+
+        localProviders = Array.isArray(data.applications)
+            ? data.applications.filter(provider => provider.status === "approved")
+            : [];
+
+        renderCustomerLeads();
+
+    } catch (error) {
+        document.getElementById("lead-message").textContent = error.message;
+    }
+}
+
+function renderCustomerLeads() {
+    const leadsList = document.getElementById("customer-leads-list");
+    leadsList.replaceChildren();
+
+    const searchText = document
+        .getElementById("lead-search")
+        .value.trim().toLowerCase();
+
+    const selectedStatus = document
+        .getElementById("lead-status-filter")
+        .value;
+
+    const statuses = ["new", "contacted", "matched", "completed"];
+
+    document.getElementById("lead-count-all").textContent = localLeads.length;
+
+    statuses.forEach(status => {
+        document.getElementById(`lead-count-${status}`).textContent =
+            localLeads.filter(lead => lead.status === status).length;
     });
 
+    const filteredLeads = localLeads.filter(lead => {
+        const matchesStatus =
+            selectedStatus === "all" || lead.status === selectedStatus;
+
+        const searchableText = [
+            lead.name,
+            lead.email,
+            lead.phone,
+            lead.zip_code,
+            lead.service,
+            lead.service_requested,
+            lead.property_type
+        ].join(" ").toLowerCase();
+
+        return matchesStatus && searchableText.includes(searchText);
+    });
+
+    if (filteredLeads.length === 0) {
+        leadsList.textContent = "No matching customer leads found.";
+        return;
+    }
+
+    filteredLeads.forEach(lead => {
+        const card = document.createElement("article");
+        card.className = "application";
+
+        const heading = document.createElement("h3");
+        heading.textContent = lead.name || "Unnamed customer";
+        card.appendChild(heading);
+
+        const fields = [
+            ["Email", lead.email],
+            ["Phone", lead.phone],
+            ["Service", lead.service_requested || lead.service],
+            ["Property type", lead.property_type],
+            ["ZIP code", lead.zip_code],
+            ["Frequency", lead.frequency],
+            ["Requested timing", lead.timing],
+            ["Additional details", lead.details],
+            ["Submitted", lead.created_at]
+        ];
+
+        fields.forEach(([label, value]) => {
+            const paragraph = document.createElement("p");
+            paragraph.textContent = `${label}: ${value || "Not provided"}`;
+            card.appendChild(paragraph);
+        });
+
+        const statusLabel = document.createElement("label");
+        statusLabel.textContent = "Lead status";
+
+        const statusSelect = document.createElement("select");
+
+        ["new", "contacted", "matched", "completed"].forEach(status => {
+            const option = document.createElement("option");
+            option.value = status;
+            option.textContent =
+                status.charAt(0).toUpperCase() + status.slice(1);
+            statusSelect.appendChild(option);
+        });
+
+        statusSelect.value = lead.status || "new";
+        statusLabel.appendChild(statusSelect);
+        card.appendChild(statusLabel);
+
+        const providerLabel = document.createElement("label");
+        providerLabel.textContent = "Assign approved provider";
+
+        const providerSelect = document.createElement("select");
+
+        const unassignedOption = document.createElement("option");
+        unassignedOption.value = "";
+        unassignedOption.textContent = "No provider assigned";
+        providerSelect.appendChild(unassignedOption);
+
+        const currentProviderIsApproved = localProviders.some(
+            provider => String(provider.id) === String(lead.assigned_provider_id)
+        );
+
+        if (lead.assigned_provider_id && !currentProviderIsApproved) {
+            const previousOption = document.createElement("option");
+            previousOption.value = String(lead.assigned_provider_id);
+            previousOption.textContent =
+                `Previously assigned provider #${lead.assigned_provider_id} (not approved)`;
+            providerSelect.appendChild(previousOption);
+        }
+
+        localProviders
+            .filter(provider => provider.status === "approved")
+            .forEach(provider => {
+                const option = document.createElement("option");
+                option.value = String(provider.id);
+                option.textContent = provider.business_name;
+                providerSelect.appendChild(option);
+            });
+
+        providerSelect.value = lead.assigned_provider_id
+            ? String(lead.assigned_provider_id)
+            : "";
+
+        providerLabel.appendChild(providerSelect);
+        card.appendChild(providerLabel);
+
+        const saveButton = document.createElement("button");
+        saveButton.className = "primary-button";
+        saveButton.textContent = "Save Lead Changes";
+
+        saveButton.addEventListener("click", async () => {
+            await updateCustomerLead(
+                lead.id,
+                statusSelect.value,
+                providerSelect.value
+            );
+        });
+
+        card.appendChild(saveButton);
+        leadsList.appendChild(card);
+    });
+}
+
+async function updateCustomerLead(leadId, status, providerId) {
+    const message = document.getElementById("lead-message");
+    message.textContent = "Saving lead changes...";
+
+    const assignedProviderId = providerId === "" ? null : Number(providerId);
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/quotes/${leadId}`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${adminToken}`
+            },
+            body: JSON.stringify({
+                status: status,
+                assigned_provider_id: assignedProviderId
+            })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            if (response.status === 401) logout();
+            throw new Error(data.error || "Could not update customer lead.");
+        }
+
+        message.textContent = "Customer lead updated successfully.";
+        await loadCustomerLeads();
+
+    } catch (error) {
+        message.textContent = error.message;
+    }
+}
 
 function renderApplications() {
     applicationsList.replaceChildren();
@@ -388,26 +669,10 @@ function renderApplications() {
         status.textContent = `Status: ${application.status}`;
         card.appendChild(status);
 
-        if (application.status === "pending") {
-            const approveButton = document.createElement("button");
-            approveButton.className = "approve-button";
-            approveButton.textContent = "Approve";
-
-            approveButton.addEventListener("click", () => {
-                updateStatus(application.id, "approved");
-            });
-
-            const rejectButton = document.createElement("button");
-            rejectButton.className = "reject-button";
-            rejectButton.textContent = "Reject";
-
-            rejectButton.addEventListener("click", () => {
-                updateStatus(application.id, "rejected");
-            });
-
-            card.appendChild(approveButton);
-            card.appendChild(rejectButton);
-        }
+        const readOnlyNote = document.createElement("p");
+        readOnlyNote.textContent = "Read-only preview: provider status changes are disabled.";
+        readOnlyNote.className = "status";
+        card.appendChild(readOnlyNote);
 
         applicationsList.appendChild(card);
     });
@@ -424,7 +689,6 @@ async function loadApplications() {
                 "Authorization": `Bearer ${adminToken}`
             }
         });
-
         const data = await response.json();
 
         if (!response.ok) {
@@ -446,39 +710,6 @@ async function loadApplications() {
 
 }
 }
-async function updateStatus(applicationId, status) {
-        const confirmed = window.confirm(
-            `Are you sure you want to ${status} this provider?`
-        );
-
-        if (!confirmed) return;
-
-        try {
-            const response = await fetch(
-                `${API_BASE}/api/admin/providers/${applicationId}/status`,
-                {
-                    method: "PATCH",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${adminToken}`
-                    },
-                    body: JSON.stringify({ status })
-                }
-            );
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || "Could not update provider.");
-            }
-
-            dashboardMessage.textContent = data.message;
-            await loadApplications();
-
-        } catch (error) {
-            dashboardMessage.textContent = error.message;
-        }
-    }
 
     function logout() {
         adminToken = null;
@@ -504,6 +735,23 @@ async function updateStatus(applicationId, status) {
     document.getElementById("logout-button").addEventListener(
         "click", logout
     );
+
+    document.getElementById("lead-search").addEventListener(
+        "input", renderCustomerLeads
+    );
+
+    document.getElementById("lead-status-filter").addEventListener(
+        "change", renderCustomerLeads
+    );
+
+    document.getElementById("refresh-leads-button").addEventListener(
+        "click", async function() {
+            await loadCustomerLeads();
+            await loadLocalProviders();
+            renderCustomerLeads();
+        }
+    );
+
 </script>
 
 </body>
